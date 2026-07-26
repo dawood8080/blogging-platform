@@ -1,36 +1,94 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Blogging Platform
+
+A full-stack, responsive blogging platform built with Next.js 15 (App Router), tRPC v11, Drizzle ORM, PostgreSQL, and TailwindCSS + shadcn/ui.
+
+## Features
+
+- **Authentication**: Custom JWT session with bcrypt (httpOnly cookie, no NextAuth)
+- **Blog CRUD**: Create, read, update, delete posts with owner-only enforcement
+- **Bonus**: Post likes, comments, categories
+- **Responsive**: Mobile-first with shadcn Table↔Card, mobile sheet nav, `max-w-prose` reading
+- **Accessible**: Labels, focus-visible, AA contrast, keyboard navigation, aria attributes
+- **Design patterns**: Repository (primary), Singleton (DB client), Observer (React Query invalidation)
+- **Dockerized**: Multi-stage Dockerfile + docker-compose for portability
+- **CI/CD**: GitHub Actions → lint, typecheck, tests, build, Vercel deploy
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Framework | Next.js 15 (App Router, RSC) |
+| API | tRPC v11 + TanStack React Query |
+| Database | PostgreSQL (Neon / docker-compose) via Drizzle ORM |
+| Auth | bcryptjs + jose (JWT, httpOnly cookie) |
+| UI | TailwindCSS v4 + shadcn/ui (base-ui) |
+| State | React Context (auth) + TanStack Query (server) |
+| Testing | Vitest + Testing Library + @vitest/coverage-v8 |
+| CI/CD | GitHub Actions → Vercel |
+| Container | Docker (multi-stage, non-root) |
 
 ## Getting Started
 
-First, run the development server:
-
 ```bash
+# Install dependencies
+npm i
+
+# Set up environment
+cp .env.example .env.local
+# Edit .env.local with your DATABASE_URL and JWT_SECRET
+
+# Start local Postgres (or use Neon URL directly)
+docker compose up -d db
+
+# Generate and run migrations
+npm run db:generate && npm run db:migrate
+
+# Start dev server
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Scripts
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Start dev server |
+| `npm run build` | Production build |
+| `npm run start` | Start production server |
+| `npm run lint` | ESLint |
+| `npm run typecheck` | TypeScript check |
+| `npm run db:generate` | Generate Drizzle migration |
+| `npm run db:migrate` | Run Drizzle migration |
+| `npm run db:push` | Push schema directly to DB |
+| `npm run test` | Run tests once |
+| `npm run test:watch` | Run tests in watch mode |
+| `npm run test:coverage` | Run tests with coverage |
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Environment Variables
 
-## Learn More
+| Variable | Description |
+|----------|-------------|
+| `DATABASE_URL` | PostgreSQL connection string |
+| `JWT_SECRET` | Secret for JWT signing (min 32 chars) |
+| `NEXT_PUBLIC_APP_URL` | Public app URL |
 
-To learn more about Next.js, take a look at the following resources:
+## Architecture
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+See [`docs/SYSTEM_DESIGN.md`](docs/SYSTEM_DESIGN.md) for the full system design, data flow, dual-surface justification, and design pattern documentation.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Docker
 
-## Deploy on Vercel
+```bash
+# Full containerized stack
+docker compose up --build
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+# Or just the database
+docker compose up -d db
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Deployment
+
+The app deploys to Vercel via GitHub Actions:
+- **Preview**: On every PR
+- **Production**: On push to `main`
+
+Required GitHub secrets: `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`, `DATABASE_URL`.
