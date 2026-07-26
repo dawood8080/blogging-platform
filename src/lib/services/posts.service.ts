@@ -11,7 +11,6 @@ export class PostsService {
   listPublished(opts: {
     page: number;
     limit: number;
-    categoryId?: string;
     authorId?: string;
   }) {
     return this.repo.findPublished(opts);

@@ -8,7 +8,7 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       reporter: ["text", "json", "html"],
-      include: ["src/lib/**", "src/trpc/routers/**"],
+      include: ["src/lib/**", "src/trpc/routers/**", "src/trpc/init.ts"],
       thresholds: {
         lines: 80,
         functions: 80,
