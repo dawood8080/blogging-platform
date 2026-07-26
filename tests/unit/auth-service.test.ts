@@ -3,6 +3,7 @@ import { describe, it, expect, vi } from "vitest";
 import type { Mock } from "vitest";
 import { AuthService } from "@/lib/services/auth.service";
 import type { IUsersRepository } from "@/lib/repositories/users.repository";
+import { hashPassword } from "@/lib/auth";
 
 function makeMockRepo(): IUsersRepository {
   return {
@@ -75,6 +76,28 @@ describe("AuthService", () => {
     await expect(
       service.login({ email: "test@test.com", password: "wrongpassword" })
     ).rejects.toThrow("INVALID_CREDENTIALS");
+  });
+
+  it("login returns user and token for valid credentials", async () => {
+    const password = "CorrectPassword1!";
+    const passwordHash = await hashPassword(password);
+
+    const repo = makeMockRepo();
+    (repo.findByEmail as Mock).mockResolvedValue({
+      id: "user-1",
+      email: "test@test.com",
+      name: "Test",
+      passwordHash,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    const service = new AuthService(repo);
+
+    const result = await service.login({ email: "test@test.com", password });
+    expect(result.user.id).toBe("user-1");
+    expect(result.user.email).toBe("test@test.com");
+    expect(result.user.name).toBe("Test");
+    expect(result.token).toBeTruthy();
   });
 
   it("getMe returns null for unknown user", async () => {
