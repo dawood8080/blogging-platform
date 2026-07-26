@@ -36,7 +36,7 @@ const postSelect = {
   author: authorSelect,
 } as const;
 
-// ponytail: mapping repeated 5x → extract once
+// mapping repeated 5x → extract once
 function mapPost(r: { post: typeof posts.$inferSelect; author: { id: string; name: string; email: string } }): PostWithAuthor {
   return { ...r.post, author: r.author };
 }

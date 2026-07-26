@@ -12,7 +12,7 @@ export async function middleware(request: NextRequest) {
 
   const isProtected = PROTECTED_ROUTES.some((route) => {
     if (route.includes(":")) {
-      // ponytail: simple prefix match for dynamic segments (/posts/*/edit)
+      // simple prefix match for dynamic segments (/posts/*/edit)
       const prefix = route.split(":")[0]; // "/posts/"
       const suffix = route.split(")")[1] || ""; // "/edit" or ""
       const segments = pathname.split("/");

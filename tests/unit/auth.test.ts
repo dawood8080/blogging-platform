@@ -13,7 +13,7 @@ vi.mock("next/headers", () => ({
   })),
 }));
 
-// ponytail: test auth functions — need to mock require() calls
+// test auth functions — need to mock require() calls
 // Since auth.ts uses require() for bcryptjs and jose, we test the logic indirectly
 
 describe("auth helpers", () => {

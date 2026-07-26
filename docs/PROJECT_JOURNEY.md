@@ -20,7 +20,7 @@
 | Design pattern: Singleton (lazy) | `db()`, `usersRepo()`, `postsRepo()`, `authService()`, `postsService()` — lazy getter singletons avoiding Turbopack TDZ |
 | Design pattern: Observer | TanStack Query mutation `onSuccess` → `queryClient.invalidateQueries()` triggers automatic refetch in subscribing components |
 | CI/CD: GitHub Actions | `.github/workflows/ci.yml` — lint, typecheck, test:coverage, build, Vercel deploy |
-| Unit tests | `tests/unit/` — schemas, auth (hash/verify/JWT), AuthService (mocked repo) — 26 passing |
+| Unit tests | `tests/unit/` + `tests/trpc/` — schemas, auth, AuthService, PostsService, repositories, router tests — 114 passing |
 | Responsive design | Tailwind CSS v4 + shadcn/ui, mobile nav sheet `src/components/layout/navbar.tsx` |
 | Dockerized setup | `Dockerfile` (multi-stage standalone) + `docker-compose.yml` (Postgres 16 + app) |
 | System design document | `docs/SYSTEM_DESIGN.md` |
@@ -292,9 +292,9 @@ Every page imports and uses `getErrorMessage()` instead of raw `err.message`.
 | `drizzle.config.ts` | Drizzle Kit config — loads `.env.local`, generates migrations to `src/db/migrations/` |
 | `vitest.config.ts` | Vitest config — jsdom environment, `@/` alias, 80% coverage threshold on `src/lib/**` + `src/trpc/routers/**` |
 | `tsconfig.json` | TypeScript config — path alias `@/*` → `src/*` |
-| `docker-compose.yml` | Docker Compose — Postgres 16 + app service with healthcheck dependency |
-| `Dockerfile` | Multi-stage build — deps → builder (Next.js standalone) → runner (node:20-alpine, non-root) |
-| `.github/workflows/ci.yml` | GitHub Actions CI/CD — Postgres service container → `npm ci` → `db:generate` → `db:migrate` → lint → typecheck → test:coverage → build → Vercel deploy (preview on PR, prod on main) |
+| `docker-compose.yml` | Docker Compose — Postgres 16 + migrate (one-shot) + app service with healthcheck dependency |
+| `Dockerfile` | Multi-stage build — builder (node:22-alpine, npm install, Next standalone) → runner (non-root, healthcheck) → migrate (drizzle-kit migrate) |
+| `.github/workflows/ci.yml` | GitHub Actions CI/CD — Postgres service container → `npm install` → `db:generate` → `db:migrate` → lint → typecheck → test:coverage → build → Vercel deploy (prod on main via Vercel CLI) |
 
 ---
 
@@ -524,7 +524,7 @@ src/trpc/init.ts                        src/trpc/routers/_app.ts
 ─────────────────                       ─────────────────────────
 initTRPC                                createTRPCRouter({
   .context<TRPCContext>()                   auth: authRouter,
-  .create({errorFormatter})                posts: postsRouter,
+  .create()                                posts: postsRouter,
 exports:                                      })
   createTRPCRouter                     → exported as appRouter (type only for client)
   publicProcedure
@@ -674,7 +674,7 @@ export function db() {
 }
 ```
 
-Applied to: `db()`, `usersRepo()`, `postsRepo()`, `authService()`, `postsService()`. Marked with `// ponytail: lazy singleton` comments.
+Applied to: `db()`, `usersRepo()`, `postsRepo()`, `authService()`, `postsService()`.
 
 ### The shadcn v4 / base-ui `render` Prop Story
 
@@ -719,8 +719,8 @@ push/PR to main
     ▼
   test job (ubuntu-latest)
     ├─ Postgres 16 service container (healthcheck: pg_isready)
-    ├─ Node 20 (npm cache)
-    ├─ npm ci
+    ├─ Node 22 (npm cache)
+    ├─ npm install
     ├─ db:generate → db:migrate (against test DB)
     ├─ lint
     ├─ typecheck
@@ -728,24 +728,23 @@ push/PR to main
     ├─ build
     └─ upload coverage artifact
     │
-    ├─ deploy-preview (PR) → Vercel preview
-    └─ deploy-prod (main) → Vercel production
+    └─ deploy-prod (main, Vercel CLI) → Vercel production
 ```
 
 ### Testing Strategy
 
-- **Unit tests** (26 passing): Zod schema validation, auth primitives (hash/verify/JWT), AuthService with mocked repository
+- **Unit tests** (114 passing): Zod schema validation, auth primitives (hash/verify/JWT), AuthService/PostsService with mocked repositories, repository methods with mock Drizzle chain, tRPC router tests via `createCaller`
 - **Coverage gate:** 80% lines/functions/branches/statements on `src/lib/**` and `src/trpc/routers/**`
 - **E2E:** Deferred (noted as "Later" in project plan)
 
 ### Docker
 
 Multi-stage Dockerfile:
-1. **deps** — `npm ci` production only
-2. **builder** — full install + `next build` (standalone output)
-3. **runner** — `node:20-alpine`, non-root user, Next standalone server
+1. **builder** — `node:22-alpine`, `npm install` + `next build` (standalone output)
+2. **runner** — `node:22-alpine`, non-root user, Next standalone server, healthcheck
+3. **migrate** — `node:22-alpine`, `npm install` + `npx drizzle-kit migrate`
 
-`docker-compose.yml`: Postgres 16 + app service with healthcheck dependency (`depends_on: db: condition: service_healthy`).
+`docker-compose.yml`: Postgres 16 + migrate (one-shot, runs first) + app service with healthcheck dependency (`depends_on: db: condition: service_healthy, migrate: condition: service_completed_successfully`).
 
 ---
 
@@ -781,7 +780,7 @@ Multi-stage Dockerfile:
 
 ### "Why `output: 'standalone'` in next.config?"
 
-> Required for Docker deployment. The standalone output bundles only the files Next.js needs to run — no `node_modules` in the container image. The runner stage uses `node:20-alpine` and runs `.next/standalone/server.js` directly. Result: ~90MB image instead of 1GB+ with full `node_modules`.
+> Required for Docker deployment. The standalone output bundles only the files Next.js needs to run — no `node_modules` in the container image. The runner stage uses `node:22-alpine` and runs `.next/standalone/server.js` directly. Result: ~90MB image instead of 1GB+ with full `node_modules`.
 
 ### "What is the Repository pattern and why use it?"
 
@@ -801,7 +800,7 @@ Multi-stage Dockerfile:
 
 ### "What testing patterns are used?"
 
-> 26 unit tests: (1) Zod schemas — valid/invalid inputs, (2) Auth primitives — hash/verify roundtrip, invalid JWT, expired JWT, (3) AuthService — mocked `IUsersRepository` injected via constructor. Coverage gate: 80% on `lib/` and `trpc/routers/`. Tests run in `jsdom` environment via Vitest. `auth-service.test.ts` demonstrates the Repository pattern's testability: mock the interface, test business logic in isolation.
+> 114 unit tests across 10 test files: (1) Zod schemas — valid/invalid inputs, (2) Auth primitives — hash/verify roundtrip, invalid JWT, expired JWT, (3) AuthService/PostsService — mocked repositories injected via constructor, (4) Repository methods — mock Drizzle chain helper, (5) tRPC routers — `appRouter.createCaller(ctx)` for auth and posts. Coverage gate: 80% on `lib/` and `trpc/routers/`. Tests run in `jsdom` environment via Vitest. `auth-service.test.ts` demonstrates the Repository pattern's testability: mock the interface, test business logic in isolation.
 
 ### "What's the data model?"
 
@@ -839,7 +838,7 @@ npm run dev
 | `npm run start` | Start production server |
 | `npm run lint` | ESLint |
 | `npm run typecheck` | `tsc --noEmit` |
-| `npm run test` | `vitest run` (26 tests) |
+| `npm run test` | `vitest run` (114 tests) |
 | `npm run test:watch` | Vitest in watch mode |
 | `npm run test:coverage` | Vitest with 80% coverage report |
 | `npm run db:generate` | Drizzle Kit — generate migrations |
@@ -850,7 +849,7 @@ npm run dev
 ### Current Status
 
 - **Completed:** All features implemented — auth, CRUD, likes, comments, error handling, responsive UI, optimistic like, CI/CD, Docker, tests, Server Components with SSR hydration, Edge middleware for protected routes, route conventions (loading/error/not-found)
-- **Verified passing:** typecheck, lint, build, 26 unit tests
+- **Verified passing:** typecheck, lint, build, 114 unit tests (10 test files)
 - **Needs verification run:** After any local changes, run `npm run typecheck && npm run lint && npm run test && npm run build` to confirm everything compiles
 - **Runtime dependency:** Postgres must be running locally (via `docker-compose up -d`) or via Neon for the app to work
 

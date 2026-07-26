@@ -1,7 +1,7 @@
 export { AuthService } from "./auth.service";
 export { PostsService } from "./posts.service";
 
-// ponytail: lazy singletons only — no eager creation, avoids Turbopack TDZ from circular deps
+// lazy singletons only — no eager creation, avoids Turbopack TDZ from circular deps
 import { AuthService } from "./auth.service";
 import { PostsService } from "./posts.service";
 

@@ -122,18 +122,18 @@ const deleteMutation = useMutation(
 ## 8. CI/CD Pipeline
 
 GitHub Actions (`.github/workflows/ci.yml`):
-1. Checkout + setup Node 20 (npm cache)
+1. Checkout + setup Node 22 (npm cache)
 2. Postgres 16 service container with health check
-3. `npm ci` → `db:generate` → `db:migrate` against test DB
+3. `npm install` → `db:generate` → `db:migrate` against test DB
 4. `lint` → `typecheck` → `test:coverage` (80% gate) → `build`
 5. Upload coverage artifact
-6. Deploy preview on PR, prod on main (via Vercel action)
+6. Deploy prod on main via Vercel CLI
 
 ## 9. Containerization
 
 Multi-stage Dockerfile:
-- **deps**: Install production deps only
-- **builder**: Full install + build (standalone output)
-- **runner**: `node:20-alpine`, non-root user, Next standalone server, healthcheck
+- **builder**: `node:22-alpine`, `npm install` + `next build` (standalone output)
+- **runner**: `node:22-alpine`, non-root user, Next standalone server, healthcheck
+- **migrate**: `node:22-alpine`, `npm install` + `npx drizzle-kit migrate`
 
-`docker-compose.yml`: PostgreSQL 16 + app service with healthcheck dependency.
+`docker-compose.yml`: PostgreSQL 16 + migrate (one-shot, runs first) + app service with healthcheck dependency.

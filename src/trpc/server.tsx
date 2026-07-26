@@ -22,7 +22,7 @@ export function HydrateClient({ children }: { children: React.ReactNode }) {
   );
 }
 
-// ponytail: prefetch bridges tRPC queryOptions to TanStack's prefetchQuery.
+// prefetch bridges tRPC queryOptions to TanStack's prefetchQuery.
 // `as any` needed because tRPC's queryOptions return type and TanStack's
 // prefetchQuery parameter type have a staleTime function incompatibility.
 // This is the pattern from the official tRPC SSR docs.

@@ -3,7 +3,7 @@ import { users } from "@/db/schema";
 import { eq } from "drizzle-orm";
 
 type User = typeof users.$inferSelect;
-// ponytail: db is now a function call
+// db is now a function call
 
 export interface CreateUserInput {
   email: string;
